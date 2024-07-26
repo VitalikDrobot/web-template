@@ -32,6 +32,10 @@
   }
 }
 
+.seats {
+  margin-top: 24px;
+}
+
 .rootNextMonthIcon,
 .rootPreviousMonthIcon {
   stroke: var(--colorWhite);

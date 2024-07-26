@@ -4,7 +4,7 @@ import { FieldArray } from 'react-final-form-arrays';
 import classNames from 'classnames';
 
 import { FormattedMessage } from '../../../../../util/reactIntl';
-import { InlineTextButton, IconClose, FieldSelect, FieldCheckbox } from '../../../../../components';
+import { InlineTextButton, IconClose, FieldSelect, FieldCheckbox, FieldTextInput } from '../../../../../components';
 
 import css from './AvailabilityPlanEntries.module.css';
 
@@ -225,6 +225,13 @@ const TimeRangeSelects = props => {
       <div className={css.fieldArrayRemove} onClick={onRemove} style={{ cursor: 'pointer' }}>
         <IconClose rootClassName={css.closeIcon} />
       </div>
+      <FieldTextInput
+        id={`${name}.seats`}
+        name={`${name}.seats`}
+        className={css.fieldSelect}
+        type="number"
+        min="1"
+      />
     </div>
   );
 };
@@ -241,11 +248,23 @@ const FieldHidden = props => {
 
 // For unitType: 'hour', set entire day (00:00 - 24:00) and hide the inputs from end user.
 const TimeRangeHidden = props => {
-  const { name } = props;
+  const { name, value, onChange, intl } = props;
   return (
-    <div className={css.formRowHidden}>
-      <FieldHidden name={`${name}.startTime`} />
-      <FieldHidden name={`${name}.endTime`} />
+    <div>
+      <div className={css.formRowHidden}>
+        <FieldHidden name={`${name}.startTime`} />
+        <FieldHidden name={`${name}.endTime`} />
+      </div>
+      <FieldTextInput
+        name={`${name}.seats`}
+        type="number"
+        initialValue={value.seats}
+        placeholder={intl.formatMessage({
+          id: 'EditListingAvailabilityPlanForm.seatsPlaceholder',
+        })}
+        min="1"
+        onChange={onChange}
+      />
     </div>
   );
 };
@@ -280,7 +299,11 @@ const AvailabilityPlanEntries = props => {
             // 'day' and 'night' units use full days
             if (useFullDays) {
               if (isChecked) {
-                formApi.mutators.push(dayOfWeek, { startTime: '00:00', endTime: '24:00' });
+                formApi.mutators.push(dayOfWeek, {
+                  startTime: '00:00',
+                  endTime: '24:00',
+                  seats: 1,
+                });
               } else {
                 formApi.mutators.remove(dayOfWeek, 0);
               }
@@ -289,7 +312,7 @@ const AvailabilityPlanEntries = props => {
               if (shouldAddEntry) {
                 // The 'hour' unit is not initialized with any value,
                 // because user need to pick them themselves.
-                formApi.mutators.push(dayOfWeek, { startTime: null, endTime: null });
+                formApi.mutators.push(dayOfWeek, { startTime: null, endTime: null, seats: 1  });
               } else if (!isChecked) {
                 // If day of week checkbox is unchecked,
                 // we'll remove all the entries for that day.
@@ -319,7 +342,18 @@ const AvailabilityPlanEntries = props => {
                   // If full days (00:00 - 24:00) are used we'll hide the start time and end time fields.
                   // This affects only day & night unit types by default.
                   return useFullDays ? (
-                    <TimeRangeHidden name={name} key={name} />
+                    <TimeRangeHidden
+                      name={name}
+                      key={name}
+                      intl={intl}
+                      value={entries[0]}
+                      onChange={e => {
+                        const { value } = e.currentTarget;
+                        const { values } = formApi.getState();
+                        const currentPlan = values[dayOfWeek][0];
+                        formApi.mutators.update(dayOfWeek, 0, { ...currentPlan, seats: value });
+                      }}
+                    />
                   ) : (
                     <TimeRangeSelects
                       key={name}
@@ -349,7 +383,7 @@ const AvailabilityPlanEntries = props => {
                   <InlineTextButton
                     type="button"
                     className={css.buttonAddNew}
-                    onClick={() => fields.push({ startTime: null, endTime: null })}
+                    onClick={() => fields.push({ startTime: null, endTime: null, seats: 1 })}
                   >
                     <FormattedMessage id="EditListingAvailabilityPlanForm.addAnother" />
                   </InlineTextButton>

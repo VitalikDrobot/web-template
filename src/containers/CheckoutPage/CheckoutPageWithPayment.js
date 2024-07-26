@@ -69,6 +69,10 @@ const paymentFlow = (selectedPaymentMethod, saveAfterOnetimePayment) => {
 const getOrderParams = (pageData, shippingDetails, optionalPaymentParams, config) => {
   const quantity = pageData.orderData?.quantity;
   const quantityMaybe = quantity ? { quantity } : {};
+
+  const seats = pageData.orderData?.seats;
+  const seatsMaybe = seats ? { seats } : {};
+
   const deliveryMethod = pageData.orderData?.deliveryMethod;
   const deliveryMethodMaybe = deliveryMethod ? { deliveryMethod } : {};
 
@@ -87,6 +91,7 @@ const getOrderParams = (pageData, shippingDetails, optionalPaymentParams, config
     listingId: pageData?.listing?.id,
     ...deliveryMethodMaybe,
     ...quantityMaybe,
+    ...seatsMaybe,
     ...bookingDatesMaybe(pageData.orderData?.bookingDates),
     ...protectedDataMaybe,
     ...optionalPaymentParams,

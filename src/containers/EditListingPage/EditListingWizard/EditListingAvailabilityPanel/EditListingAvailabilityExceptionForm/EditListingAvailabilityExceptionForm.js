@@ -7,7 +7,7 @@ import classNames from 'classnames';
 import { intlShape, injectIntl, FormattedMessage } from '../../../../../util/reactIntl';
 import { propTypes } from '../../../../../util/types';
 
-import { Form, H3, PrimaryButton } from '../../../../../components';
+import { Form, H3, PrimaryButton, FieldTextInput } from '../../../../../components';
 
 import AvailabilityModeSelector from './AvailabilityModeSelector';
 import ExceptionDateTimeRange from './ExceptionDateTimeRange';
@@ -19,6 +19,25 @@ import css from './EditListingAvailabilityExceptionForm.module.css';
 // EditListingAvailabilityExceptionForm //
 //////////////////////////////////////////
 const EditListingAvailabilityExceptionForm = props => {
+  const formState = formApi.getState();
+  const isAvailable = formState.values.availability === 'available';
+
+  const seatsSelectionMaybe = isAvailable ? (
+    <FieldTextInput
+      className={css.seats}
+      id="seats"
+      name="seats"
+      type="number"
+      min="1"
+      label={intl.formatMessage({
+        id: 'EditListingAvailabilityExceptionForm.seatsLabel',
+      })}
+      placeholder={intl.formatMessage({
+        id: 'EditListingAvailabilityExceptionForm.seatsPlaceholder',
+      })}
+    />
+  ) : null;
+
   return (
     <FinalForm
       {...props}
@@ -118,6 +137,7 @@ const EditListingAvailabilityExceptionForm = props => {
                   values={values}
                 />
               )}
+              {seatsSelectionMaybe}
             </div>
 
             <div className={css.submitButton}>

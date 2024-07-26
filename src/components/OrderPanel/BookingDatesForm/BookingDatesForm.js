@@ -20,6 +20,7 @@ import {
   initialVisibleMonth,
 } from '../../../util/dates';
 import { LINE_ITEM_DAY, LINE_ITEM_NIGHT, TIME_SLOT_TIME, propTypes } from '../../../util/types';
+import { generateMonths } from '../../../util/generators';
 import { BOOKING_PROCESS_NAME } from '../../../transactions/transaction';
 
 import { Form, IconArrowHead, PrimaryButton, FieldDateRangeInput, H6 } from '../../../components';
@@ -365,26 +366,6 @@ const handleFocusedInputChange = setFocusedInput => focusedInput => {
 // lineItems from this Template's backend for the EstimatedTransactionMaybe
 // In case you add more fields to the form, make sure you add
 // the values here to the orderData object.
-const handleFormSpyChange = (
-  listingId,
-  isOwnListing,
-  fetchLineItemsInProgress,
-  onFetchTransactionLineItems
-) => formValues => {
-  const { startDate, endDate } =
-    formValues.values && formValues.values.bookingDates ? formValues.values.bookingDates : {};
-
-  if (startDate && endDate && !fetchLineItemsInProgress) {
-    onFetchTransactionLineItems({
-      orderData: {
-        bookingStart: startDate,
-        bookingEnd: endDate,
-      },
-      listingId,
-      isOwnListing,
-    });
-  }
-};
 
 // IconArrowHead component might not be defined if exposed directly to the file.
 // This component is called before IconArrowHead component in components/index.js
@@ -444,12 +425,37 @@ export const BookingDatesFormComponent = props => {
 
   const onFormSubmit = handleFormSubmit(setFocusedInput, onSubmit);
   const onFocusedInputChange = handleFocusedInputChange(setFocusedInput);
+
+  const handleFormSpyChange = (
+    listingId,
+    isOwnListing,
+    fetchLineItemsInProgress,
+    onFetchTransactionLineItems
+  ) => formValues => {
+    const { seats, bookingDates } = formValues.values;
+
+    const { startDate, endDate } = bookingDates ? bookingDates : {};
+
+    if (startDate && endDate && !fetchLineItemsInProgress) {
+      onFetchTransactionLineItems({
+        orderData: {
+          bookingStart: startDate,
+          bookingEnd: endDate,
+          seats: parseInt(seats, 10),
+        },
+        listingId,
+        isOwnListing,
+      });
+    }
+  };
+
   const onFormSpyChange = handleFormSpyChange(
     listingId,
     isOwnListing,
     fetchLineItemsInProgress,
     onFetchTransactionLineItems
   );
+
   return (
     <FinalForm
       {...rest}
@@ -460,6 +466,7 @@ export const BookingDatesFormComponent = props => {
           endDatePlaceholder,
           startDatePlaceholder,
           formId,
+          form: formApi,
           handleSubmit,
           intl,
           lineItemUnitType,
@@ -532,6 +539,28 @@ export const BookingDatesFormComponent = props => {
           dayCountAvailableForBooking,
           timeZone
         );
+
+        const getSeatsArray = () => {
+          const formState = formApi.getState();
+          const { bookingDates } = formState.values;
+
+          if (!bookingDates) {
+            return null;
+          }
+
+          const minSeatsTimeSlot = getMinSeatsTimeSlot(
+            monthlyTimeSlots,
+            timeZone,
+            bookingDates.startDate,
+            bookingDates.endDate
+          );
+
+          // Return an array of the seat options a customer
+          // can pick for the time range
+          return Array(minSeatsTimeSlot.seats)
+            .fill()
+            .map((_, i) => i + 1);
+        };
 
         return (
           <Form onSubmit={handleSubmit} className={classes} enforcePagePreloadFor="CheckoutPage">
@@ -609,6 +638,8 @@ export const BookingDatesFormComponent = props => {
               onClose={event =>
                 setCurrentMonth(getStartOf(event?.startDate ?? startOfToday, 'month', timeZone))
               }
+              seatsArray={getSeatsArray()}
+              seatsLabel={intl.formatMessage({ id: 'BookingDatesForm.seatsTitle' })}
             />
 
             {showEstimatedBreakdown ? (
@@ -656,6 +687,71 @@ export const BookingDatesFormComponent = props => {
       }}
     />
   );
+};
+
+/**
+ * Return an array of timeslots for the months between start date and end date
+ * @param {*} monthlyTimeSlots
+ * @param {*} startDate
+ * @param {*} endDate
+ * @param {*} timeZone
+ * @returns
+ */
+const pickBookingMonthTimeSlots = (
+  monthlyTimeSlots,
+  startDate,
+  endDate,
+  timeZone
+) => {
+  // The generateMonths generator returns the first day of each month that is spanned
+  // by the time range between start date and end date.
+  const monthsInRange = generateMonths(startDate, endDate, timeZone);
+
+  return monthsInRange.reduce((timeSlots, firstOfMonth) => {
+    return [
+      ...timeSlots,
+      ...pickMonthlyTimeSlots(monthlyTimeSlots, firstOfMonth, timeZone),
+    ];
+  }, []);
+};
+
+// Get the time slot for a booking duration that has the least seats
+const getMinSeatsTimeSlot = (
+  monthlyTimeSlots,
+  timeZone,
+  startDate,
+  endDate
+) => {
+  const timeSlots = pickBookingMonthTimeSlots(
+    monthlyTimeSlots,
+    startDate,
+    endDate,
+    timeZone
+  );
+
+  // Determine the timeslots that fall between start date and end date
+  const bookingTimeslots = timeSlots.filter(ts => {
+    const { start, end } = ts.attributes;
+    return (
+      // booking start date falls within time slot
+      (start < startDate && end > startDate) ||
+      // whole time slot is within booking period
+      (start >= startDate && end <= endDate) ||
+      // booking end date falls within time slot
+      (start < endDate && end > endDate)
+    );
+  });
+
+  // Return the timeslot with the least seats in the booking period
+  return bookingTimeslots.reduce((minSeats, ts) => {
+    if (!minSeats?.seats) {
+      return ts.attributes;
+    }
+
+    return ts.attributes.seats < minSeats.seats
+      ? ts.attributes
+      : minSeats;
+  }, {});
 };
 
 BookingDatesFormComponent.defaultProps = {
